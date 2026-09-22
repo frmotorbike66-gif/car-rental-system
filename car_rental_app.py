@@ -93,7 +93,7 @@ def calculate_days_by_hour(start_date, start_time, end_date, end_time):
         
         total_hours = (end_dt - start_dt).total_seconds() / 3600
         
-        # ทุก 24 ชม. + อนุโลม 2 ชม. = 1 รอบ
+        # กฎ: 24 ชม. + อนุโลม 2 ชม. = 1 รอบ
         grace = 2
         cycle = 24 + grace
         
@@ -104,7 +104,6 @@ def calculate_days_by_hour(start_date, start_time, end_date, end_time):
         return max(1, days), round(total_hours, 1)
     except Exception as e:
         return 1, 0
-
 init_files()
 
 menu = st.sidebar.radio("เลือกเมนู", [
