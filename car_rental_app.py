@@ -61,7 +61,7 @@ os.makedirs("rental_data", exist_ok=True)
 def init_files():
     for f, cols in [
         (FILE_CARS, ["รหัสรถ", "ชื่อ/รุ่น/สี/ป้าย", "สถานะ", "หมายเหตุ"]),
-        (FILE_CUSTOMERS, ["ชื่อลูกค้า", "เบอร์โทรศัพท์", "ที่อยู่"]),
+        (FILE_CUSTOMERS, ["ชื่อ-นามสกุล", "เบอร์โทร", "ที่อยู่"]),
         (FILE_BOOKINGS, ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", 
                          "วันที่เริ่ม", "เวลาเริ่ม", 
                          "วันที่คืน", "เวลาคืน", 
@@ -158,43 +158,50 @@ if menu == "🏍️ จัดการข้อมูลรถ":
     else:
         st.info("ยังไม่มีข้อมูลรถ — กรุณาเพิ่มรายการแรกด้านบน")
 
-# ====== จัดการข้อมูลลูกค้า ======
+# ====== จัดการข้อมูลลูกค้า — ไม่มีรหัสลูกค้า ======
 elif menu == "👤 จัดการข้อมูลลูกค้า":
     st.header("👤 ข้อมูลลูกค้า")
     df = load_data(FILE_CUSTOMERS)
     
+    # ทำความสะอาดข้อมูล — เก็บเฉพาะคอลัมน์ที่ต้องการ
+    desired_cols = ["ชื่อ-นามสกุล", "เบอร์โทร", "ที่อยู่"]
+    df = df[[c for c in desired_cols if c in df.columns]].copy()
+    
+    # แก้ไขข้อมูล
     if not df.empty:
         edit_idx = st.selectbox("✏️ แก้ไขข้อมูล — เลือกลูกค้า", [""] + list(df.index + 1), format_func=lambda x: "เลือก..." if x=="" else f"รายการที่ {x}")
         if edit_idx:
             row = df.iloc[int(edit_idx)-1]
             with st.form("edit_customer"):
-                name = st.text_input("ชื่อลูกค้า", value=row.get("ชื่อลูกค้า", ""))
-                phone = st.text_input("เบอร์โทรศัพท์", value=row.get("เบอร์โทรศัพท์", ""))
+                name = st.text_input("ชื่อ-นามสกุล", value=row.get("ชื่อ-นามสกุล", ""))
+                phone = st.text_input("เบอร์โทร", value=row.get("เบอร์โทร", ""))
                 addr = st.text_area("ที่อยู่", value=row.get("ที่อยู่", ""))
                 if st.form_submit_button("💾 บันทึกการแก้ไข"):
-                    df.loc[int(edit_idx)-1] = {"ชื่อลูกค้า": name, "เบอร์โทรศัพท์": phone, "ที่อยู่": addr}
+                    df.loc[int(edit_idx)-1] = {"ชื่อ-นามสกุล": name, "เบอร์โทร": phone, "ที่อยู่": addr}
                     save_data(df, FILE_CUSTOMERS)
                     st.success("✅ แก้ไขข้อมูลสำเร็จ")
                     st.rerun()
             st.markdown("---")
     
+    # เพิ่มลูกค้าใหม่
     with st.form("form_customer"):
-        name = st.text_input("ชื่อลูกค้า")
-        phone = st.text_input("เบอร์โทรศัพท์")
+        name = st.text_input("ชื่อ-นามสกุล")
+        phone = st.text_input("เบอร์โทร")
         addr = st.text_area("ที่อยู่")
         if st.form_submit_button("✅ เพิ่มลูกค้า"):
             if name:
-                new_row = {"ชื่อลูกค้า": name, "เบอร์โทรศัพท์": phone, "ที่อยู่": addr}
+                new_row = {"ชื่อ-นามสกุล": name, "เบอร์โทร": phone, "ที่อยู่": addr}
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 save_data(df, FILE_CUSTOMERS)
                 st.success("✅ บันทึกข้อมูลสำเร็จ")
                 st.rerun()
             else:
-                st.warning("⚠️ กรุณากรอกชื่อลูกค้า")
+                st.warning("⚠️ กรุณากรอกชื่อ-นามสกุล")
     
     st.subheader("📋 รายการลูกค้าทั้งหมด")
     if not df.empty:
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        # ลบรายการ
         del_idx = st.selectbox("🗑️ ลบรายการ — เลือกลูกค้า", [""] + list(df.index + 1), format_func=lambda x: "เลือก..." if x=="" else f"รายการที่ {x}")
         if st.button("🗑️ ลบทันที") and del_idx:
             df = df.drop(int(del_idx)-1).reset_index(drop=True)
@@ -204,7 +211,7 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
     else:
         st.info("ยังไม่มีข้อมูลลูกค้า")
 
-# ====== ทำการจอง — มีเวลา + มัดจำ ======
+# ====== ทำการจอง ======
 elif menu == "📅 ทำการจอง":
     st.header("📅 ทำการจอง")
     df_car = load_data(FILE_CARS)
@@ -214,7 +221,8 @@ elif menu == "📅 ทำการจอง":
         st.warning("⚠️ กรุณาเพิ่มข้อมูลรถและลูกค้าก่อนทำการจอง")
     else:
         avail_cars = df_car["รหัสรถ"].tolist() if "รหัสรถ" in df_car.columns else []
-        cust_names = df_cust["ชื่อลูกค้า"].tolist() if "ชื่อลูกค้า" in df_cust.columns else []
+        # ใช้ชื่อ-นามสกุล ในการเลือก
+        cust_names = df_cust["ชื่อ-นามสกุล"].tolist() if "ชื่อ-นามสกุล" in df_cust.columns else []
         
         with st.form("form_booking"):
             bid = get_next_booking_id()
@@ -369,7 +377,7 @@ elif menu == "📈 รายงานสรุป":
     st.subheader("📋 ข้อมูลรถ")
     if not df_cars.empty: st.dataframe(df_cars, use_container_width=True)
     st.subheader("📋 ข้อมูลลูกค้า")
-    if not df_cust.empty: st.dataframe(df_cust, use_container_width=True)
+    if not df_cust.empty: st.dataframe(df_cust, use_container_width=True, hide_index=True)
     st.subheader("📋 ข้อมูลการจอง")
     if not df_book.empty:
         desired_order = ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", "วันที่เริ่ม", "เวลาเริ่ม", "วันที่คืน", "เวลาคืน", "เงินมัดจำ", "หมายเหตุ", "วันที่ทำรายการ"]
