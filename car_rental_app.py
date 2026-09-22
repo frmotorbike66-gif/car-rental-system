@@ -85,7 +85,7 @@ def get_next_booking_id():
     nums = df["รหัสจอง"].str.extract(r"(\d+)$")[0].dropna()
     return f"B{nums.astype(int).max()+1:03d}" if not nums.empty else "B001"
 
-# ✅ สูตรใหม่: ทุก 26 ชม. = 1 วัน
+# ✅ สูตรใหม่: 24ชม.=1วัน, อนุโลมเกินได้ไม่เกิน 2 ชม.
 def calculate_days_by_hour(start_date, start_time, end_date, end_time):
     try:
         start_dt = datetime.combine(pd.to_datetime(start_date).date(), start_time)
@@ -93,10 +93,13 @@ def calculate_days_by_hour(start_date, start_time, end_date, end_time):
         
         total_hours = (end_dt - start_dt).total_seconds() / 3600
         
-        # เกณฑ์: ≤26ชม.=1วัน, >26–52ชม.=2วัน, >52–78ชม.=3วัน, ...
+        # ทุก 24 ชม. + อนุโลม 2 ชม. = 1 รอบ
+        grace = 2
+        cycle = 24 + grace
+        
         days = 1
-        if total_hours > 26:
-            days = int((total_hours - 1e-9) // 26) + 1
+        if total_hours > cycle:
+            days = int((total_hours - 1e-9) // cycle) + 1
         
         return max(1, days), round(total_hours, 1)
     except Exception as e:
@@ -225,7 +228,7 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
     else:
         st.info("ยังไม่มีข้อมูลลูกค้า")
 
-# ====== ทำการจอง — เกณฑ์ 26 ชม. ======
+# ====== ทำการจอง — 24ชม.+อนุโลม2ชม. ======
 elif menu == "📅 ทำการจอง":
     st.header("📅 ทำการจอง")
     df_car = load_data(FILE_CARS)
@@ -262,7 +265,7 @@ elif menu == "📅 ทำการจอง":
                     price_per_day = float(car_row.iloc[0]["ราคาต่อวัน"])
                     days, total_hours = calculate_days_by_hour(start_date, start_time, end_date, end_time)
                     total_price = price_per_day * days
-                    st.info(f"💰 ราคาต่อวัน: {price_per_day:,.0f} บาท | ช่วงเวลา: {total_hours:.1f} ชม. | จำนวนวัน: {days} วัน | **ค่าเช่ารวม: {total_price:,.0f} บาท**")
+                    st.info(f"💰 ราคาต่อวัน: {price_per_day:,.0f} บาท | ช่วงเวลา: {total_hours:.1f} ชม. | จำนวนวัน: {days} วัน | **ค่าเช่ารวม: {total_price:,.0f} บาท**\n💡 อนุโลมเกินได้ไม่เกิน 2 ชม.")
             
             deposit = st.text_input("💰 เงินมัดจำ (บาท)", placeholder="เช่น 500")
             note = st.text_input("หมายเหตุ")
