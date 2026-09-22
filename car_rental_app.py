@@ -60,12 +60,12 @@ os.makedirs("rental_data", exist_ok=True)
 
 def init_files():
     for f, cols in [
-        (FILE_CARS, ["รหัสรถ", "ชื่อ/รุ่น/สี/ป้าย", "สถานะ", "หมายเหตุ"]),
+        (FILE_CARS, ["รหัสรถ", "ยี่ห้อ-รุ่น/ป้าย", "ราคาต่อวัน", "สถานะ", "หมายเหตุ"]),
         (FILE_CUSTOMERS, ["ชื่อ-นามสกุล", "เบอร์โทร", "ที่อยู่"]),
         (FILE_BOOKINGS, ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", 
                          "วันที่เริ่ม", "เวลาเริ่ม", 
                          "วันที่คืน", "เวลาคืน", 
-                         "เงินมัดจำ", "หมายเหตุ", "วันที่ทำรายการ"])
+                         "จำนวนวัน", "ค่าเช่ารวม", "เงินมัดจำ", "หมายเหตุ", "วันที่ทำรายการ"])
     ]:
         if not os.path.exists(f):
             pd.DataFrame(columns=cols).to_csv(f, index=False, encoding="utf-8-sig")
@@ -85,6 +85,14 @@ def get_next_booking_id():
     nums = df["รหัสจอง"].str.extract(r"(\d+)$")[0].dropna()
     return f"B{nums.astype(int).max()+1:03d}" if not nums.empty else "B001"
 
+def calculate_days(start_date, end_date):
+    try:
+        s = pd.to_datetime(start_date).date()
+        e = pd.to_datetime(end_date).date()
+        return max(1, (e - s).days + 1)
+    except:
+        return 1
+
 init_files()
 
 menu = st.sidebar.radio("เลือกเมนู", [
@@ -98,11 +106,12 @@ menu = st.sidebar.radio("เลือกเมนู", [
 st.title(f"🏍️ {APP_NAME}")
 st.markdown("ระบบปฏิทินจองรถเช่าอัตโนมัติ")
 
-# ====== จัดการข้อมูลรถ ======
+# ====== จัดการข้อมูลรถ — มีช่องราคาต่อวัน ======
 if menu == "🏍️ จัดการข้อมูลรถ":
     st.header("🏍️ ข้อมูลรถ")
     df = load_data(FILE_CARS)
     
+    # แก้ไขข้อมูล
     if not df.empty and "รหัสรถ" in df.columns:
         edit_id = st.selectbox("✏️ แก้ไขข้อมูล — เลือกรถ", [""] + list(df["รหัสรถ"].unique()))
         if edit_id:
@@ -111,25 +120,28 @@ if menu == "🏍️ จัดการข้อมูลรถ":
                 col1, col2 = st.columns(2)
                 with col1:
                     car_id = st.text_input("รหัสรถ", value=row.get("รหัสรถ", ""), disabled=True)
-                    name = st.text_input("ชื่อ/รุ่น/สี/ป้าย", value=row.get("ชื่อ/รุ่น/สี/ป้าย", ""))
+                    name = st.text_input("ชื่อ/รุ่น/สี/ป้าย", value=row.get("ยี่ห้อ-รุ่น/ป้าย", ""))
                 with col2:
+                    price = st.number_input("ราคาต่อวัน (บาท)", min_value=0, value=int(float(row.get("ราคาต่อวัน", 300) or 300)))
                     status = st.selectbox("สถานะ", ["พร้อมใช้งาน", "กำลังเช่า", "ซ่อมบำรุง"], 
                                           index=["พร้อมใช้งาน", "กำลังเช่า", "ซ่อมบำรุง"].index(row.get("สถานะ", "พร้อมใช้งาน")))
                     note = st.text_input("หมายเหตุ", value=row.get("หมายเหตุ", ""))
                 
                 if st.form_submit_button("💾 บันทึกการแก้ไข"):
-                    df.loc[df["รหัสรถ"] == edit_id, ["ชื่อ/รุ่น/สี/ป้าย", "สถานะ", "หมายเหตุ"]] = [name, status, note]
+                    df.loc[df["รหัสรถ"] == edit_id, ["ยี่ห้อ-รุ่น/ป้าย", "ราคาต่อวัน", "สถานะ", "หมายเหตุ"]] = [name, price, status, note]
                     save_data(df, FILE_CARS)
                     st.success("✅ แก้ไขข้อมูลสำเร็จ")
                     st.rerun()
             st.markdown("---")
     
+    # เพิ่มรถใหม่
     with st.form("form_car"):
         col1, col2 = st.columns(2)
         with col1:
             car_id = st.text_input("รหัสรถ (เช่น V001)")
             name = st.text_input("ชื่อ/รุ่น/สี/ป้าย (เช่น Grand Filano สีดำ 1กก 1111)")
         with col2:
+            price = st.number_input("ราคาต่อวัน (บาท)", min_value=0, value=300)
             status = st.selectbox("สถานะ", ["พร้อมใช้งาน", "กำลังเช่า", "ซ่อมบำรุง"])
             note = st.text_input("หมายเหตุ")
         
@@ -138,7 +150,7 @@ if menu == "🏍️ จัดการข้อมูลรถ":
                 if not df.empty and "รหัสรถ" in df.columns and car_id in df["รหัสรถ"].values:
                     st.error("❌ รหัสรถนี้มีอยู่แล้ว ใช้ฟังก์ชันแก้ไขด้านบน")
                 else:
-                    new_row = {"รหัสรถ": car_id, "ชื่อ/รุ่น/สี/ป้าย": name, "สถานะ": status, "หมายเหตุ": note}
+                    new_row = {"รหัสรถ": car_id, "ยี่ห้อ-รุ่น/ป้าย": name, "ราคาต่อวัน": price, "สถานะ": status, "หมายเหตุ": note}
                     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     save_data(df, FILE_CARS)
                     st.success("✅ บันทึกข้อมูลสำเร็จ")
@@ -158,16 +170,13 @@ if menu == "🏍️ จัดการข้อมูลรถ":
     else:
         st.info("ยังไม่มีข้อมูลรถ — กรุณาเพิ่มรายการแรกด้านบน")
 
-# ====== จัดการข้อมูลลูกค้า — ไม่มีรหัสลูกค้า ======
+# ====== จัดการข้อมูลลูกค้า ======
 elif menu == "👤 จัดการข้อมูลลูกค้า":
     st.header("👤 ข้อมูลลูกค้า")
     df = load_data(FILE_CUSTOMERS)
-    
-    # ทำความสะอาดข้อมูล — เก็บเฉพาะคอลัมน์ที่ต้องการ
     desired_cols = ["ชื่อ-นามสกุล", "เบอร์โทร", "ที่อยู่"]
     df = df[[c for c in desired_cols if c in df.columns]].copy()
     
-    # แก้ไขข้อมูล
     if not df.empty:
         edit_idx = st.selectbox("✏️ แก้ไขข้อมูล — เลือกลูกค้า", [""] + list(df.index + 1), format_func=lambda x: "เลือก..." if x=="" else f"รายการที่ {x}")
         if edit_idx:
@@ -183,7 +192,6 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
                     st.rerun()
             st.markdown("---")
     
-    # เพิ่มลูกค้าใหม่
     with st.form("form_customer"):
         name = st.text_input("ชื่อ-นามสกุล")
         phone = st.text_input("เบอร์โทร")
@@ -201,7 +209,6 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
     st.subheader("📋 รายการลูกค้าทั้งหมด")
     if not df.empty:
         st.dataframe(df, use_container_width=True, hide_index=True)
-        # ลบรายการ
         del_idx = st.selectbox("🗑️ ลบรายการ — เลือกลูกค้า", [""] + list(df.index + 1), format_func=lambda x: "เลือก..." if x=="" else f"รายการที่ {x}")
         if st.button("🗑️ ลบทันที") and del_idx:
             df = df.drop(int(del_idx)-1).reset_index(drop=True)
@@ -211,7 +218,7 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
     else:
         st.info("ยังไม่มีข้อมูลลูกค้า")
 
-# ====== ทำการจอง ======
+# ====== ทำการจอง + แสดงรายการด้านล่าง ======
 elif menu == "📅 ทำการจอง":
     st.header("📅 ทำการจอง")
     df_car = load_data(FILE_CARS)
@@ -221,7 +228,6 @@ elif menu == "📅 ทำการจอง":
         st.warning("⚠️ กรุณาเพิ่มข้อมูลรถและลูกค้าก่อนทำการจอง")
     else:
         avail_cars = df_car["รหัสรถ"].tolist() if "รหัสรถ" in df_car.columns else []
-        # ใช้ชื่อ-นามสกุล ในการเลือก
         cust_names = df_cust["ชื่อ-นามสกุล"].tolist() if "ชื่อ-นามสกุล" in df_cust.columns else []
         
         with st.form("form_booking"):
@@ -239,11 +245,28 @@ elif menu == "📅 ทำการจอง":
                 end_date = st.date_input("วันที่คืนรถ")
                 end_time = st.time_input("เวลาคืนรถ", value=datetime.strptime("18:00", "%H:%M").time())
             
+            # คำนวณราคาแสดงตอนเลือก
+            price_per_day = 0
+            days = 1
+            total_price = 0
+            if sel_car and "ราคาต่อวัน" in df_car.columns:
+                car_row = df_car[df_car["รหัสรถ"] == sel_car]
+                if not car_row.empty:
+                    price_per_day = float(car_row.iloc[0]["ราคาต่อวัน"])
+                    days = calculate_days(start_date, end_date)
+                    total_price = price_per_day * days
+                    st.info(f"💰 ราคาต่อวัน: {price_per_day:,.0f} บาท | จำนวนวัน: {days} วัน | **ค่าเช่ารวม: {total_price:,.0f} บาท**")
+            
             deposit = st.text_input("💰 เงินมัดจำ (บาท)", placeholder="เช่น 500")
             note = st.text_input("หมายเหตุ")
             
             if st.form_submit_button("✅ บันทึกการจอง"):
                 if sel_car and sel_cust and start_date and end_date:
+                    days = calculate_days(start_date, end_date)
+                    car_row = df_car[df_car["รหัสรถ"] == sel_car]
+                    price_per_day = float(car_row.iloc[0]["ราคาต่อวัน"]) if not car_row.empty else 0
+                    total_price = price_per_day * days
+                    
                     new_row = {
                         "รหัสจอง": bid,
                         "รหัสรถ": sel_car,
@@ -252,6 +275,8 @@ elif menu == "📅 ทำการจอง":
                         "เวลาเริ่ม": start_time.strftime("%H:%M"),
                         "วันที่คืน": end_date,
                         "เวลาคืน": end_time.strftime("%H:%M"),
+                        "จำนวนวัน": days,
+                        "ค่าเช่ารวม": f"{total_price:.0f}",
                         "เงินมัดจำ": deposit,
                         "หมายเหตุ": note,
                         "วันที่ทำรายการ": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -264,10 +289,32 @@ elif menu == "📅 ทำการจอง":
                     st.rerun()
                 else:
                     st.warning("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน")
+    
+    # แสดงรายการจองด้านล่าง
+    st.markdown("---")
+    st.subheader("📋 รายการจองทั้งหมด")
+    df_book = load_data(FILE_BOOKINGS)
+    
+    if not df_book.empty:
+        display_cols = ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", 
+                        "วันที่เริ่ม", "เวลาเริ่ม", "วันที่คืน", "เวลาคืน",
+                        "จำนวนวัน", "ค่าเช่ารวม", "เงินมัดจำ", "หมายเหตุ"]
+        cols = [c for c in display_cols if c in df_book.columns]
+        st.dataframe(df_book[cols], use_container_width=True)
+        
+        st.markdown("#### 🗑️ ลบรายการจอง")
+        del_booking = st.selectbox("เลือกรหัสจองที่ต้องการลบ", [""] + list(df_book["รหัสจอง"].unique()))
+        if st.button("🗑️ ลบรายการนี้") and del_booking:
+            df_book = df_book[df_book["รหัสจอง"] != del_booking]
+            save_data(df_book, FILE_BOOKINGS)
+            st.success("✅ ลบรายการสำเร็จ")
+            st.rerun()
+    else:
+        st.info("ยังไม่มีรายการจอง")
 
-# ====== ปฏิทินการจองแบบภาพ ======
+# ====== ปฏิทินการจอง ======
 elif menu == "📊 ปฏิทินการจอง":
-    st.header("📊 ระบบปฏิทินจองรถเช่าอัตโนมัติ")
+    st.header("📊 ปฏิทินการจอง")
     
     today = datetime.today()
     month = st.selectbox("เลือกเดือน", list(range(1, 13)), index=today.month-1)
@@ -284,7 +331,7 @@ elif menu == "📊 ปฏิทินการจอง":
     
     st.markdown(f"### 📅 ปฏิทินการจอง — {month}/{year}")
     
-    header_cols = ["รหัส", "ชื่อ/รายละเอียด", "สถานะปัจจุบัน"] + [str(d) for d in range(1, days_in_month+1)]
+    header_cols = ["รหัส", "ชื่อรถ", "สถานะ"] + [str(d) for d in range(1, days_in_month+1)]
     html = """
     <style>
     .cal-table { border-collapse: collapse; width: 100%; font-size: 12px; }
@@ -304,7 +351,7 @@ elif menu == "📊 ปฏิทินการจอง":
     
     for _, car in df_cars.iterrows():
         car_id = car.get("รหัสรถ", "")
-        car_name = car.get("ชื่อ/รุ่น/สี/ป้าย", "")
+        car_name = car.get("ยี่ห้อ-รุ่น/ป้าย", "")
         status = car.get("สถานะ", "พร้อมใช้งาน")
         
         html += f"<tr><td class='col-fixed'><strong>{car_id}</strong></td><td class='col-fixed' style='text-align:left'>{car_name}</td><td class='col-fixed'>{status}</td>"
@@ -341,14 +388,11 @@ elif menu == "📊 ปฏิทินการจอง":
     st.markdown(html, unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("""
-    **คำอธิบายสี:**
-    🟥 แดง = กำลังเช่า / ไม่ว่าง | 🟧 ส้ม = มีการจอง | ⬜ ขาว = ว่าง
-    """)
+    st.markdown("🟥 แดง = กำลังเช่า | 🟧 ส้ม = มีการจอง | ⬜ ขาว = ว่าง")
     
     with st.expander("ดูข้อมูลการจองทั้งหมด"):
         if not df_book.empty:
-            desired_order = ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", "วันที่เริ่ม", "เวลาเริ่ม", "วันที่คืน", "เวลาคืน", "เงินมัดจำ", "หมายเหตุ", "วันที่ทำรายการ"]
+            desired_order = ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", "วันที่เริ่ม", "วันที่คืน", "จำนวนวัน", "ค่าเช่ารวม", "เงินมัดจำ", "หมายเหตุ"]
             cols = [c for c in desired_order if c in df_book.columns]
             st.dataframe(df_book[cols], use_container_width=True)
         else:
@@ -357,21 +401,27 @@ elif menu == "📊 ปฏิทินการจอง":
 # ====== รายงานสรุป ======
 elif menu == "📈 รายงานสรุป":
     st.header("📈 รายงานสรุป")
+    
     df_cars = load_data(FILE_CARS)
     df_cust = load_data(FILE_CUSTOMERS)
     df_book = load_data(FILE_BOOKINGS)
+    
+    total_rent = 0
+    total_deposit = 0
+    if not df_book.empty:
+        if "ค่าเช่ารวม" in df_book.columns:
+            total_rent = pd.to_numeric(df_book["ค่าเช่ารวม"], errors="coerce").sum() or 0
+        if "เงินมัดจำ" in df_book.columns:
+            total_deposit = pd.to_numeric(df_book["เงินมัดจำ"], errors="coerce").sum() or 0
     
     c1, c2, c3 = st.columns(3)
     c1.metric("🚗 จำนวนรถทั้งหมด", len(df_cars))
     c2.metric("👤 จำนวนลูกค้า", len(df_cust))
     c3.metric("📅 จำนวนการจอง", len(df_book))
     
-    # รวมเงินมัดจำ
-    if not df_book.empty and "เงินมัดจำ" in df_book.columns:
-        try:
-            total_deposit = pd.to_numeric(df_book["เงินมัดจำ"], errors="coerce").sum()
-            st.metric("💰 รวมเงินมัดจำทั้งหมด", f"{total_deposit:,.0f} บาท")
-        except: pass
+    c4, c5 = st.columns(2)
+    c4.metric("💰 รวมค่าเช่าทั้งหมด", f"{total_rent:,.0f} บาท")
+    c5.metric("🔒 รวมเงินมัดจำทั้งหมด", f"{total_deposit:,.0f} บาท")
     
     st.markdown("---")
     st.subheader("📋 ข้อมูลรถ")
@@ -380,6 +430,6 @@ elif menu == "📈 รายงานสรุป":
     if not df_cust.empty: st.dataframe(df_cust, use_container_width=True, hide_index=True)
     st.subheader("📋 ข้อมูลการจอง")
     if not df_book.empty:
-        desired_order = ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", "วันที่เริ่ม", "เวลาเริ่ม", "วันที่คืน", "เวลาคืน", "เงินมัดจำ", "หมายเหตุ", "วันที่ทำรายการ"]
+        desired_order = ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", "วันที่เริ่ม", "วันที่คืน", "จำนวนวัน", "ค่าเช่ารวม", "เงินมัดจำ", "หมายเหตุ"]
         cols = [c for c in desired_order if c in df_book.columns]
         st.dataframe(df_book[cols], use_container_width=True)
