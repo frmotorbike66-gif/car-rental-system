@@ -354,7 +354,7 @@ elif menu == "📅 ทำการจอง":
     else:
         st.info("ยังไม่มีรายการจอง")
 
-# ====== ปฏิทินการจอง — สีตรงตามที่ต้องการ ======
+# ====== ปฏิทินการจอง — อ้างอิงวันที่เริ่ม-คืนรถโดยตรง ======
 elif menu == "📊 ปฏิทินการจอง":
     st.header("📊 ปฏิทินการจอง")
     
@@ -403,30 +403,32 @@ elif menu == "📊 ปฏิทินการจอง":
             bk_car = df_book[df_book["รหัสรถ"] == car_id]
             for _, bk in bk_car.iterrows():
                 try:
+                    # ✅ อ้างอิงตรงจากวันที่เริ่มและวันที่คืน
                     s = datetime.strptime(str(bk["วันที่เริ่ม"]), "%Y-%m-%d").date()
                     e = datetime.strptime(str(bk["วันที่คืน"]), "%Y-%m-%d").date()
                     bk_status = bk.get("สถานะการจอง", "")
-                    if (s.month == month and s.year == year) or (e.month == month and e.year == year):
-                        bookings.append((s, e, bk_status))
+                    bookings.append((s, e, bk_status))
                 except: pass
         
-        # ✅ กำหนดสีตามเงื่อนไขที่ต้องการ
+        # ✅ กำหนดสีตามช่วงวันที่เริ่ม-คืน + สถานะ
         for day in range(1, days_in_month+1):
             d = datetime(year, month, day).date()
             
             status_today = None
             for s, e, bks in bookings:
+                # วันนี้อยู่ในช่วงวันที่เริ่มถึงวันที่คืนหรือไม่
                 if s <= d <= e:
                     status_today = bks
                     break
             
-            if status_today == "กำลังใช้งาน" or car_status == "กำลังใช้งาน":
-                cls = "cell-red"       # 🔴 แดง = กำลังใช้งาน
+            # กำหนดสี
+            if status_today == "กำลังใช้งาน":
+                cls = "cell-red"       # 🔴 แดง = กำลังใช้งาน (อยู่ในช่วงวันที่จอง)
             elif status_today == "จองแล้ว":
-                cls = "cell-orange"    # 🟠 ส้ม = จองแล้ว
+                cls = "cell-orange"    # 🟠 ส้ม = จองแล้ว (อยู่ในช่วงวันที่จอง)
             else:
                 cls = "cell-white"     # ⬜ ขาว = ว่าง ไม่มีจอง ไม่มีใช้งาน
-            
+        
             html += f"<td class='{cls}'></td>"
         html += "</tr>"
     
@@ -435,6 +437,7 @@ elif menu == "📊 ปฏิทินการจอง":
     
     st.markdown("---")
     st.markdown("🔴 แดง = กำลังใช้งาน | 🟠 ส้ม = จองแล้ว | ⬜ ขาว = ว่าง ไม่มีจอง ไม่มีใช้งาน")
+    st.markdown("📌 สีแสดงเฉพาะวันที่อยู่ในช่วง **วันที่เริ่ม – วันที่คืน** เท่านั้น")
     
     with st.expander("ดูข้อมูลการจองทั้งหมด"):
         if not df_book.empty:
