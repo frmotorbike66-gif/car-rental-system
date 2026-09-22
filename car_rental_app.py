@@ -144,8 +144,8 @@ if menu == "🏍️ จัดการข้อมูลรถ":
                     name = st.text_input("ชื่อ/รุ่น/สี/ป้าย", value=row.get("ยี่ห้อ-รุ่น/ป้าย", ""))
                 with col2:
                     price = st.number_input("ราคาต่อวัน (บาท)", min_value=0, value=int(float(row.get("ราคาต่อวัน", 300) or 300)))
-                    status = st.selectbox("สถานะ", ["พร้อมใช้งาน", "จองแล้ว", "กำลังเช่า", "ซ่อมบำรุง"], 
-                                          index=["พร้อมใช้งาน", "จองแล้ว", "กำลังเช่า", "ซ่อมบำรุง"].index(row.get("สถานะ", "พร้อมใช้งาน")))
+                    status = st.selectbox("สถานะ", ["ว่าง", "จองแล้ว", "กำลังใช้งาน", "ซ่อมบำรุง"], 
+                                          index=["ว่าง", "จองแล้ว", "กำลังใช้งาน", "ซ่อมบำรุง"].index(row.get("สถานะ", "ว่าง")))
                     note = st.text_input("หมายเหตุ", value=row.get("หมายเหตุ", ""))
                 
                 if st.form_submit_button("💾 บันทึกการแก้ไข"):
@@ -162,7 +162,7 @@ if menu == "🏍️ จัดการข้อมูลรถ":
             name = st.text_input("ชื่อ/รุ่น/สี/ป้าย (เช่น Grand Filano สีดำ 1กก 1111)")
         with col2:
             price = st.number_input("ราคาต่อวัน (บาท)", min_value=0, value=300)
-            status = st.selectbox("สถานะ", ["พร้อมใช้งาน", "จองแล้ว", "กำลังเช่า", "ซ่อมบำรุง"])
+            status = st.selectbox("สถานะ", ["ว่าง", "จองแล้ว", "กำลังใช้งาน", "ซ่อมบำรุง"])
             note = st.text_input("หมายเหตุ")
         
         if st.form_submit_button("✅ เพิ่มรถใหม่"):
@@ -265,8 +265,8 @@ elif menu == "📅 ทำการจอง":
                 end_date = st.date_input("วันที่คืนรถ")
                 end_time = st.time_input("เวลาคืนรถ", value=datetime.strptime("18:00", "%H:%M").time())
             
-            # ✅ เลือกสถานะการจอง
-            status_booking = st.selectbox("สถานะ", ["จองแล้ว", "กำลังเช่า"])
+            # ✅ เลือกสถานะตามที่ต้องการ
+            status_booking = st.selectbox("สถานะ", ["จองแล้ว", "กำลังใช้งาน"])
             
             price_per_day = 0
             days = 1
@@ -309,7 +309,7 @@ elif menu == "📅 ทำการจอง":
                     df_book = pd.concat([df_book, pd.DataFrame([new_row])], ignore_index=True)
                     save_data(df_book, FILE_BOOKINGS)
                     
-                    # ✅ อัปเดตสถานะรถไปที่ตารางรถ
+                    # ✅ อัปเดตสถานะรถ
                     update_car_status(sel_car, status_booking)
                     
                     st.success(f"✅ บันทึกสำเร็จ! รหัสจอง: {bid} | สถานะ: {status_booking} | {total_hours:.1f} ชม. = {days} วัน")
@@ -329,11 +329,11 @@ elif menu == "📅 ทำการจอง":
         cols = [c for c in display_cols if c in df_book.columns]
         st.dataframe(df_book[cols], use_container_width=True)
         
-        # เปลี่ยนสถานะการจอง
+        # เปลี่ยนสถานะเองได้
         st.markdown("#### 🔄 เปลี่ยนสถานะ")
         edit_booking = st.selectbox("เลือกรหัสจอง", [""] + list(df_book["รหัสจอง"].unique()))
         if edit_booking:
-            new_status = st.selectbox("สถานะใหม่", ["จองแล้ว", "กำลังเช่า", "พร้อมใช้งาน"])
+            new_status = st.selectbox("สถานะใหม่", ["จองแล้ว", "กำลังใช้งาน", "ว่าง"])
             if st.button("✅ อัปเดตสถานะ"):
                 df_book.loc[df_book["รหัสจอง"] == edit_booking, "สถานะการจอง"] = new_status
                 car_id = df_book.loc[df_book["รหัสจอง"] == edit_booking, "รหัสรถ"].iloc[0]
@@ -347,14 +347,14 @@ elif menu == "📅 ทำการจอง":
         if st.button("🗑️ ลบรายการนี้") and del_booking:
             car_id = df_book.loc[df_book["รหัสจอง"] == del_booking, "รหัสรถ"].iloc[0]
             df_book = df_book[df_book["รหัสจอง"] != del_booking]
-            update_car_status(car_id, "พร้อมใช้งาน")
+            update_car_status(car_id, "ว่าง")
             save_data(df_book, FILE_BOOKINGS)
-            st.success("✅ ลบรายการสำเร็จ — คืนสถานะรถเป็นพร้อมใช้งาน")
+            st.success("✅ ลบรายการสำเร็จ — คืนสถานะรถเป็นว่าง")
             st.rerun()
     else:
         st.info("ยังไม่มีรายการจอง")
 
-# ====== ปฏิทินการจอง — แสดงสีตามสถานะ ======
+# ====== ปฏิทินการจอง — สีตรงตามที่ต้องการ ======
 elif menu == "📊 ปฏิทินการจอง":
     st.header("📊 ปฏิทินการจอง")
     
@@ -381,8 +381,7 @@ elif menu == "📊 ปฏิทินการจอง":
     .cal-table th { background: #2c3e50; color: white; }
     .cell-red { background: #e74c3c; color: white; }
     .cell-orange { background: #ff9f43; color: white; }
-    .cell-green { background: #2ecc71; color: white; }
-    .cell-empty { background: white; }
+    .cell-white { background: #ffffff; }
     .col-fixed { background: #f8f9fa; position: sticky; left: 0; z-index: 1; }
     </style>
     <table class="cal-table">
@@ -394,7 +393,7 @@ elif menu == "📊 ปฏิทินการจอง":
     
     for _, car in df_cars.iterrows():
         car_id = car.get("รหัสรถ", "")
-        car_status = car.get("สถานะ", "พร้อมใช้งาน")
+        car_status = car.get("สถานะ", "ว่าง")
         
         html += f"<tr><td class='col-fixed'><strong>{car_id}</strong></td><td class='col-fixed'>{car_status}</td>"
         
@@ -406,30 +405,27 @@ elif menu == "📊 ปฏิทินการจอง":
                 try:
                     s = datetime.strptime(str(bk["วันที่เริ่ม"]), "%Y-%m-%d").date()
                     e = datetime.strptime(str(bk["วันที่คืน"]), "%Y-%m-%d").date()
-                    bk_status = bk.get("สถานะการจอง", "จองแล้ว")
+                    bk_status = bk.get("สถานะการจอง", "")
                     if (s.month == month and s.year == year) or (e.month == month and e.year == year):
                         bookings.append((s, e, bk_status))
                 except: pass
         
-        # เติมสีแต่ละวัน
+        # ✅ กำหนดสีตามเงื่อนไขที่ต้องการ
         for day in range(1, days_in_month+1):
             d = datetime(year, month, day).date()
             
-            # เช็คสถานะจากการจอง
             status_today = None
             for s, e, bks in bookings:
                 if s <= d <= e:
                     status_today = bks
                     break
             
-            if status_today == "กำลังเช่า" or car_status == "กำลังเช่า":
-                cls = "cell-red"
+            if status_today == "กำลังใช้งาน" or car_status == "กำลังใช้งาน":
+                cls = "cell-red"       # 🔴 แดง = กำลังใช้งาน
             elif status_today == "จองแล้ว":
-                cls = "cell-orange"
-            elif car_status == "พร้อมใช้งาน":
-                cls = "cell-green"
+                cls = "cell-orange"    # 🟠 ส้ม = จองแล้ว
             else:
-                cls = "cell-empty"
+                cls = "cell-white"     # ⬜ ขาว = ว่าง ไม่มีจอง ไม่มีใช้งาน
             
             html += f"<td class='{cls}'></td>"
         html += "</tr>"
@@ -438,7 +434,7 @@ elif menu == "📊 ปฏิทินการจอง":
     st.markdown(html, unsafe_allow_html=True)
     
     st.markdown("---")
-    st.markdown("🔴 แดง = กำลังเช่า | 🟠 ส้ม = จองแล้ว | 🟢 เขียว = พร้อมใช้งาน | ⬜ ขาว = ว่าง/อื่นๆ")
+    st.markdown("🔴 แดง = กำลังใช้งาน | 🟠 ส้ม = จองแล้ว | ⬜ ขาว = ว่าง ไม่มีจอง ไม่มีใช้งาน")
     
     with st.expander("ดูข้อมูลการจองทั้งหมด"):
         if not df_book.empty:
