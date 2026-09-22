@@ -93,9 +93,9 @@ def calculate_days_by_hour(start_date, start_time, end_date, end_time):
         
         total_hours = (end_dt - start_dt).total_seconds() / 3600
         
-        # กฎ: 24 ชม. + อนุโลม 2 ชม. = 1 รอบ
+        # ✅ ตรงนี้แหละค่ะ — 24 ชม. + อนุโลม 2 ชม. สำหรับวันที่คืน
         grace = 2
-        cycle = 24 + grace
+        cycle = 24 + grace  # = 26 ชม.
         
         days = 1
         if total_hours > cycle:
