@@ -85,7 +85,7 @@ def get_next_booking_id():
     nums = df["รหัสจอง"].str.extract(r"(\d+)$")[0].dropna()
     return f"B{nums.astype(int).max()+1:03d}" if not nums.empty else "B001"
 
-# ✅ สูตรใหม่: 24ชม.=1วัน, อนุโลมเกินได้ไม่เกิน 2 ชม.
+# ✅ สูตรที่ถูกต้อง: 24ชม./วัน + อนุโลม 2ชม. เฉพาะเวลาคืน
 def calculate_days_by_hour(start_date, start_time, end_date, end_time):
     try:
         start_dt = datetime.combine(pd.to_datetime(start_date).date(), start_time)
@@ -93,17 +93,23 @@ def calculate_days_by_hour(start_date, start_time, end_date, end_time):
         
         total_hours = (end_dt - start_dt).total_seconds() / 3600
         
-        # ✅ ตรงนี้แหละค่ะ — 24 ชม. + อนุโลม 2 ชม. สำหรับวันที่คืน
-        grace = 2
-        cycle = 24 + grace  # = 26 ชม.
+        # คำนวณ: วันเต็ม + ตรวจสอบชม.ที่เกินเวลาคืน
+        days_full = int(total_hours // 24)           # จำนวนวันเต็ม
+        remainder = total_hours % 24                  # ชม.ที่เหลือหลังจากวันเต็ม
+        grace = 2                                     # อนุโลมให้เกินได้ 2 ชม.
         
-        days = 1
-        if total_hours > cycle:
-            days = int((total_hours - 1e-9) // cycle) + 1
+        if remainder <= grace:
+            days = days_full if days_full > 0 else 1
+        else:
+            days = days_full + 1
         
-        return max(1, days), round(total_hours, 1)
+        # อย่างน้อยต้องเป็น 1 วัน
+        days = max(1, days)
+        
+        return days, round(total_hours, 1)
     except Exception as e:
         return 1, 0
+
 init_files()
 
 menu = st.sidebar.radio("เลือกเมนู", [
@@ -227,7 +233,7 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
     else:
         st.info("ยังไม่มีข้อมูลลูกค้า")
 
-# ====== ทำการจอง — 24ชม.+อนุโลม2ชม. ======
+# ====== ทำการจอง — สูตรใหม่ ======
 elif menu == "📅 ทำการจอง":
     st.header("📅 ทำการจอง")
     df_car = load_data(FILE_CARS)
@@ -264,7 +270,7 @@ elif menu == "📅 ทำการจอง":
                     price_per_day = float(car_row.iloc[0]["ราคาต่อวัน"])
                     days, total_hours = calculate_days_by_hour(start_date, start_time, end_date, end_time)
                     total_price = price_per_day * days
-                    st.info(f"💰 ราคาต่อวัน: {price_per_day:,.0f} บาท | ช่วงเวลา: {total_hours:.1f} ชม. | จำนวนวัน: {days} วัน | **ค่าเช่ารวม: {total_price:,.0f} บาท**\n💡 อนุโลมเกินได้ไม่เกิน 2 ชม.")
+                    st.info(f"💰 ราคาต่อวัน: {price_per_day:,.0f} บาท | ช่วงเวลา: {total_hours:.1f} ชม. | จำนวนวัน: {days} วัน | **ค่าเช่ารวม: {total_price:,.0f} บาท**\n💡 24 ชม./วัน คืนล่าช้าได้ไม่เกิน 2 ชม.")
             
             deposit = st.text_input("💰 เงินมัดจำ (บาท)", placeholder="เช่น 500")
             note = st.text_input("หมายเหตุ")
