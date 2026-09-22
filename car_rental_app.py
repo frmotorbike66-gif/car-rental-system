@@ -85,20 +85,18 @@ def get_next_booking_id():
     nums = df["รหัสจอง"].str.extract(r"(\d+)$")[0].dropna()
     return f"B{nums.astype(int).max()+1:03d}" if not nums.empty else "B001"
 
-# ✅ สูตรนับวันใหม่: นับตามชม. — ทุก 24 ชม. = 1 วัน
+# ✅ สูตรใหม่: ทุก 26 ชม. = 1 วัน
 def calculate_days_by_hour(start_date, start_time, end_date, end_time):
     try:
-        # รวมวัน+เวลาเป็น datetime เต็ม
         start_dt = datetime.combine(pd.to_datetime(start_date).date(), start_time)
         end_dt = datetime.combine(pd.to_datetime(end_date).date(), end_time)
         
-        # คำนวณชั่วโมงทั้งหมด
         total_hours = (end_dt - start_dt).total_seconds() / 3600
         
-        # ภายใน 24 ชม. = 1 วัน, ทุกๆ 24 ชม. ถัดไปนับเพิ่ม 1 วัน
+        # เกณฑ์: ≤26ชม.=1วัน, >26–52ชม.=2วัน, >52–78ชม.=3วัน, ...
         days = 1
-        if total_hours > 24:
-            days = int(total_hours // 24) + (1 if total_hours % 24 > 0 else 0)
+        if total_hours > 26:
+            days = int((total_hours - 1e-9) // 26) + 1
         
         return max(1, days), round(total_hours, 1)
     except Exception as e:
@@ -227,7 +225,7 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
     else:
         st.info("ยังไม่มีข้อมูลลูกค้า")
 
-# ====== ทำการจอง — ปรับสูตรนับวัน ======
+# ====== ทำการจอง — เกณฑ์ 26 ชม. ======
 elif menu == "📅 ทำการจอง":
     st.header("📅 ทำการจอง")
     df_car = load_data(FILE_CARS)
@@ -254,7 +252,6 @@ elif menu == "📅 ทำการจอง":
                 end_date = st.date_input("วันที่คืนรถ")
                 end_time = st.time_input("เวลาคืนรถ", value=datetime.strptime("18:00", "%H:%M").time())
             
-            # ✅ คำนวณตามช่วงเวลาจริง
             price_per_day = 0
             days = 1
             total_price = 0
@@ -294,7 +291,7 @@ elif menu == "📅 ทำการจอง":
                     df_book = load_data(FILE_BOOKINGS)
                     df_book = pd.concat([df_book, pd.DataFrame([new_row])], ignore_index=True)
                     save_data(df_book, FILE_BOOKINGS)
-                    st.success(f"✅ จองสำเร็จ! รหัสจอง: {bid} | จำนวน {days} วัน | รวม {total_price:,.0f} บาท")
+                    st.success(f"✅ จองสำเร็จ! รหัสจอง: {bid} | {total_hours:.1f} ชม. = {days} วัน | รวม {total_price:,.0f} บาท")
                     st.balloons()
                     st.rerun()
                 else:
