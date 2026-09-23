@@ -298,7 +298,7 @@ elif menu == "📊 ปฏิทินการจอง":
     m = st.selectbox("เดือน", list(range(1, 13)), index=today.month - 1)
     y = st.selectbox("ปี", list(range(2025, 2031)), index=2026 - 2025)
     
-    # คำนวณจำนวนวันในเดือน — แก้ไขให้ถูกต้อง ✅
+    # ✅ แก้ไขจุดที่เคยผิด — ไม่ให้เดือนเกิน 12
     if m == 12:
         days_in_month = 31
     else:
