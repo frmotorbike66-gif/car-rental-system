@@ -4,6 +4,7 @@ import os
 import json
 import base64
 from datetime import datetime, timedelta
+import requests
 
 # ==========================================
 # 🔧 ตั้งค่า
@@ -16,7 +17,6 @@ VALID_USERS = {
 
 st.set_page_config(page_title=APP_NAME, layout="wide")
 
-# อ่านค่าลับจาก Streamlit Secrets
 try:
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     GITHUB_REPO = st.secrets["GITHUB_REPO"]
@@ -33,10 +33,8 @@ FILES = {
 }
 
 # ==========================================
-# 🔌 ฟังก์ชันอ่าน-เขียนข้อมูลผ่าน GitHub API
+# 🔌 ฟังก์ชันอ่าน-เขียนข้อมูล
 # ==========================================
-import requests
-
 def github_api(path, method="GET", data=None):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
@@ -71,14 +69,12 @@ def init_csv(path, columns):
 # ==========================================
 # 🚀 เริ่มทำงาน
 # ==========================================
-# สร้างไฟล์เปล่าถ้ายังไม่มี
 init_csv(FILES["cars"], ["รหัสรถ", "ยี่ห้อ-รุ่น/ป้าย", "ราคาต่อวัน", "สถานะ", "หมายเหตุ"])
 init_csv(FILES["customers"], ["ชื่อ-นามสกุล", "เบอร์โทร", "ที่อยู่"])
 init_csv(FILES["bookings"], ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", 
          "วันที่เริ่ม", "เวลาเริ่ม", "วันที่คืน", "เวลาคืน",
          "สถานะการจอง", "จำนวนวัน", "ค่าเช่ารวม", "เงินมัดจำ", "หมายเหตุ", "วันที่ทำรายการ"])
 
-# เข้าสู่ระบบ
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -96,7 +92,6 @@ if not st.session_state.logged_in:
             st.error("❌ ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง")
     st.stop()
 
-# เมนู
 st.sidebar.title(f"🏍️ {APP_NAME}")
 st.sidebar.write(f"สวัสดีค่ะ, {st.session_state.username}")
 if st.sidebar.button("🚪 ออกจากระบบ"):
@@ -115,7 +110,6 @@ menu = st.sidebar.radio("เลือกเมนู", [
 st.title(f"🏍️ {APP_NAME}")
 st.markdown("ระบบจัดการเช่ารถ — ข้อมูลบันทึกขึ้น GitHub อัตโนมัติ")
 
-# สูตรคิดเงิน: 24ชม./วัน + อนุโลม 2ชม.
 def calculate_days_by_hour(start_date, start_time, end_date, end_time):
     try:
         start_dt = datetime.combine(pd.to_datetime(start_date).date(), start_time)
@@ -273,7 +267,6 @@ elif menu == "📅 ทำการจอง":
             df_book = pd.concat([df_book, pd.DataFrame([new_row])], ignore_index=True)
             save_csv(df_book, FILES["bookings"])
             
-            # อัปเดตสถานะรถ
             df_car.loc[df_car["รหัสรถ"]==sel_car, "สถานะ"] = status_booking
             save_csv(df_car, FILES["cars"])
             
