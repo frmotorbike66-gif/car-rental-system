@@ -313,9 +313,9 @@ elif menu == "📊 ปฏิทินการจอง":
     
     # คำนวณจำนวนวันในเดือน
     if m == 12:
-    days_in_month = 31
+        days_in_month = 31
     else:
-    days_in_month = (datetime(y, m + 1, 1) - timedelta(days=1)).days
+        days_in_month = (datetime(y, m + 1, 1) - timedelta(days=1)).days
     
     df_car = read_csv(FILES["cars"])
     df_book = read_csv(FILES["bookings"])
