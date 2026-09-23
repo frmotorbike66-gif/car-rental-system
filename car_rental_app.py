@@ -357,16 +357,37 @@ elif menu == "📊 ปฏิทินการจอง":
         for d in range(1, days_in_month+1):
             day = datetime(y,m,d).date()
             tstat = None
-            for s,e,bks in bks:
+                for _, car in df_car.iterrows():
+        cid = car["รหัสรถ"]
+        cstat = car["สถานะ"]
+        html += f"<tr><td class='col-fixed'><strong>{cid}</strong></td><td class='col-fixed'>{cstat}</td>"
+        
+        bookings = []
+        if not df_book.empty:
+            for _, bk in df_book[df_book["รหัสรถ"]==cid].iterrows():
+                try:
+                    s = datetime.strptime(str(bk["วันที่เริ่ม"]), "%Y-%m-%d").date()
+                    e = datetime.strptime(str(bk["วันที่คืน"]), "%Y-%m-%d").date()
+                    bookings.append((s, e, bk["สถานะการจอง"]))
+                except:
+                    pass
+        
+        for d in range(1, days_in_month+1):
+            day = datetime(y, m, d).date()
+            tstat = None
+            for s, e, bstatus in bookings:
                 if s <= day <= e:
-                    tstat = bks; break
-            if tstat == "กำลังใช้งาน": cls = "cell-red"
-            elif tstat == "จองแล้ว": cls = "cell-orange"
-            else: cls = "cell-white"
+                    tstat = bstatus
+                    break
+            
+            if tstat == "กำลังใช้งาน":
+                cls = "cell-red"
+            elif tstat == "จองแล้ว":
+                cls = "cell-orange"
+            else:
+                cls = "cell-white"
             html += f"<td class='{cls}'></td>"
         html += "</tr>"
-    
-    html += "</table>"
     st.markdown(html, unsafe_allow_html=True)
     st.markdown("🔴 แดง=กำลังใช้งาน | 🟠 ส้ม=จองแล้ว | ⬜ ขาว=ว่าง")
 
