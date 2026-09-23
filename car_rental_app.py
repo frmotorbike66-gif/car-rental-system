@@ -318,46 +318,29 @@ elif menu == "📊 ปฏิทินการจอง":
     today = datetime.today()
     m = st.selectbox("เดือน", list(range(1,13)), index=today.month-1)
     y = st.selectbox("ปี", list(range(2025,2031)), index=2026-2025)
-    days_in_month = (datetime(y, m%12+1, 1) - timedelta(days=1)).day
+    days_in_month = (datetime(y, m%12+1, 1) - timedelta(days=1)).days
     
     df_car = read_csv(FILES["cars"])
     df_book = read_csv(FILES["bookings"])
     
     st.markdown(f"### 📅 ปฏิทิน — {m}/{y}")
     
-    html = f"""
-    <style>.cal-table{{border-collapse:collapse;width:100%;font-size:11px;}}
-    .cal-table th,.cal-table td{{border:1px solid #ddd;padding:4px;text-align:center;height:30px;}}
-    .cal-table th{{background:#2c3e50;color:white;}}
-    .cell-red{{background:#e74c3c;color:white;}}
-    .cell-orange{{background:#ff9f43;color:white;}}
-    .cell-white{{background:#fff;}}
-    .col-fixed{{background:#f8f9fa;position:sticky;left:0;z-index:1;}}
+    html = """
+    <style>.cal-table{border-collapse:collapse;width:100%;font-size:11px;}
+    .cal-table th,.cal-table td{border:1px solid #ddd;padding:4px;text-align:center;height:30px;}
+    .cal-table th{background:#2c3e50;color:white;}
+    .cell-red{background:#e74c3c;color:white;}
+    .cell-orange{background:#ff9f43;color:white;}
+    .cell-white{background:#fff;}
+    .col-fixed{background:#f8f9fa;position:sticky;left:0;z-index:1;}
     </style>
     <table class="cal-table"><tr>
     <th class="col-fixed">รหัส</th><th class="col-fixed">สถานะ</th>
-    {"".join(f"<th>{d}</th>" for d in range(1,days_in_month+1))}
-    </tr>
     """
+    html += "".join(f"<th>{d}</th>" for d in range(1, days_in_month+1))
+    html += "</tr>"
     
     for _, car in df_car.iterrows():
-        cid = car["รหัสรถ"]
-        cstat = car["สถานะ"]
-        html += f"<tr><td class='col-fixed'><strong>{cid}</strong></td><td class='col-fixed'>{cstat}</td>"
-        
-        bks = []
-        if not df_book.empty:
-            for _, bk in df_book[df_book["รหัสรถ"]==cid].iterrows():
-                try:
-                    s = datetime.strptime(str(bk["วันที่เริ่ม"]), "%Y-%m-%d").date()
-                    e = datetime.strptime(str(bk["วันที่คืน"]), "%Y-%m-%d").date()
-                    bks.append((s,e,bk["สถานะการจอง"]))
-                except:pass
-        
-        for d in range(1, days_in_month+1):
-            day = datetime(y,m,d).date()
-            tstat = None
-                for _, car in df_car.iterrows():
         cid = car["รหัสรถ"]
         cstat = car["สถานะ"]
         html += f"<tr><td class='col-fixed'><strong>{cid}</strong></td><td class='col-fixed'>{cstat}</td>"
@@ -386,8 +369,11 @@ elif menu == "📊 ปฏิทินการจอง":
                 cls = "cell-orange"
             else:
                 cls = "cell-white"
+            
             html += f"<td class='{cls}'></td>"
         html += "</tr>"
+    
+    html += "</table>"
     st.markdown(html, unsafe_allow_html=True)
     st.markdown("🔴 แดง=กำลังใช้งาน | 🟠 ส้ม=จองแล้ว | ⬜ ขาว=ว่าง")
 
