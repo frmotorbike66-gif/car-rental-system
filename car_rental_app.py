@@ -5,9 +5,6 @@ import base64
 from datetime import datetime, timedelta
 import requests
 
-# ==========================================
-# 🔧 ตั้งค่า
-# ==========================================
 APP_NAME = "FR Motor Bike"
 VALID_USERS = {
     "admin": "123456",
@@ -31,9 +28,6 @@ FILES = {
     "bookings": f"{DATA_DIR}/bookings.csv"
 }
 
-# ==========================================
-# 🔌 ฟังก์ชันอ่าน-เขียนข้อมูล
-# ==========================================
 def github_api(path, method="GET", data=None):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
     headers = {"Authorization": f"token {GITHUB_TOKEN}", "Content-Type": "application/json"}
@@ -65,9 +59,6 @@ def init_csv(path, columns):
     if df.empty:
         save_csv(pd.DataFrame(columns=columns), path)
 
-# ==========================================
-# 🚀 เริ่มทำงาน
-# ==========================================
 init_csv(FILES["cars"], ["รหัสรถ", "ยี่ห้อ-รุ่น/ป้าย", "ราคาต่อวัน", "สถานะ", "หมายเหตุ"])
 init_csv(FILES["customers"], ["ชื่อ-นามสกุล", "เบอร์โทร", "ที่อยู่"])
 init_csv(FILES["bookings"], ["รหัสจอง", "รหัสรถ", "ชื่อลูกค้า", 
@@ -129,7 +120,6 @@ def get_next_booking_id():
     nums = df["รหัสจอง"].str.extract(r"(\d+)$")[0].dropna()
     return f"B{nums.astype(int).max()+1:03d}" if not nums.empty else "B001"
 
-# ====== จัดการข้อมูลรถ ======
 if menu == "🏍️ จัดการข้อมูลรถ":
     st.header("🏍️ ข้อมูลรถ")
     df = read_csv(FILES["cars"])
@@ -182,7 +172,6 @@ if menu == "🏍️ จัดการข้อมูลรถ":
             st.success("✅ ลบสำเร็จ")
             st.rerun()
 
-# ====== จัดการลูกค้า ======
 elif menu == "👤 จัดการข้อมูลลูกค้า":
     st.header("👤 ข้อมูลลูกค้า")
     df = read_csv(FILES["customers"])
@@ -193,7 +182,7 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
         with st.form("edit_cust"):
             name = st.text_input("ชื่อ-นามสกุล", value=row["ชื่อ-นามสกุล"])
             phone = st.text_input("เบอร์โทร", value=row["เบอร์โทร"])
-            addr = st.text_area("ที่อยู่", value=row["ที่อยู่"])
+            addr = st.text_area("ที่จัดส่งรถ", value=row["ที่อยู่"])
             if st.form_submit_button("💾 บันทึก"):
                 df.loc[int(edit_idx)-1] = [name,phone,addr]
                 save_csv(df, FILES["customers"])
@@ -203,7 +192,7 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
     with st.form("add_cust"):
         name = st.text_input("ชื่อ-นามสกุล")
         phone = st.text_input("เบอร์โทร")
-        addr = st.text_area("ที่อยู่")
+        addr = st.text_area("ที่จัดส่งรถ")
         if st.form_submit_button("✅ เพิ่มลูกค้า"):
             if name:
                 df = pd.concat([df, pd.DataFrame([{"ชื่อ-นามสกุล":name,"เบอร์โทร":phone,"ที่อยู่":addr}])], ignore_index=True)
@@ -221,7 +210,6 @@ elif menu == "👤 จัดการข้อมูลลูกค้า":
             st.success("✅ ลบสำเร็จ")
             st.rerun()
 
-# ====== ทำการจอง ======
 elif menu == "📅 ทำการจอง":
     st.header("📅 ทำการจอง")
     df_car = read_csv(FILES["cars"])
@@ -304,18 +292,18 @@ elif menu == "📅 ทำการจอง":
             st.success("✅ ลบสำเร็จ — คืนสถานะเป็นว่าง")
             st.rerun()
 
-# ====== ปฏิทิน ======
 elif menu == "📊 ปฏิทินการจอง":
     st.header("📊 ปฏิทินการจอง")
     today = datetime.today()
-m = st.selectbox("เดือน", list(range(1, 13)), index=today.month - 1)
-y = st.selectbox("ปี", list(range(2025, 2031)), index=2026 - 2025)
-
-# คำนวณจำนวนวันในเดือน — แบบที่ทำงานแน่นอน ✅
-if m == 12:
-    days_in_month = 31
-else:
-    days_in_month = (datetime(y, m + 1, 1) - timedelta(days=1)).days
+    m = st.selectbox("เดือน", list(range(1, 13)), index=today.month - 1)
+    y = st.selectbox("ปี", list(range(2025, 2031)), index=2026 - 2025)
+    
+    # คำนวณจำนวนวันในเดือน — แก้ไขให้ถูกต้อง ✅
+    if m == 12:
+        days_in_month = 31
+    else:
+        days_in_month = (datetime(y, m + 1, 1) - timedelta(days=1)).days
+    
     df_car = read_csv(FILES["cars"])
     df_book = read_csv(FILES["bookings"])
     
@@ -345,9 +333,10 @@ else:
         if not df_book.empty:
             for _, bk in df_book[df_book["รหัสรถ"]==cid].iterrows():
                 try:
-                    s = datetime.strptime(str(bk["วันที่เริ่ม"]), "%Y-%m-%d").date()
-                    e = datetime.strptime(str(bk["วันที่คืน"]), "%Y-%m-%d").date()
-                    bookings.append((s, e, bk["สถานะการจอง"]))
+                    s = datetime.strptime(bk["วันที่เริ่ม"], "%Y-%m-%d").date()
+                    e = datetime.strptime(bk["วันที่คืน"], "%Y-%m-%d").date()
+                    bstatus = bk["สถานะการจอง"]
+                    bookings.append((s, e, bstatus))
                 except:
                     pass
         
@@ -371,32 +360,27 @@ else:
     
     html += "</table>"
     st.markdown(html, unsafe_allow_html=True)
-    st.markdown("🔴 แดง=กำลังใช้งาน | 🟠 ส้ม=จองแล้ว | ⬜ ขาว=ว่าง")
 
-# ====== รายงานสรุป ======
 elif menu == "📈 รายงานสรุป":
     st.header("📈 รายงานสรุป")
-    df_car = read_csv(FILES["cars"])
-    df_cust = read_csv(FILES["customers"])
     df_book = read_csv(FILES["bookings"])
     
-    total_rent = pd.to_numeric(df_book["ค่าเช่ารวม"], errors="coerce").sum() or 0 if not df_book.empty else 0
-    total_dep = pd.to_numeric(df_book["เงินมัดจำ"], errors="coerce").sum() or 0 if not df_book.empty else 0
-    
-    c1,c2,c3 = st.columns(3)
-    c1.metric("🚗 รถทั้งหมด", len(df_car))
-    c2.metric("👤 ลูกค้าทั้งหมด", len(df_cust))
-    c3.metric("📅 การจองทั้งหมด", len(df_book))
-    
-    c4,c5 = st.columns(2)
-    c4.metric("💰 รวมค่าเช่า", f"{total_rent:,.0f} บาท")
-    c5.metric("🔒 รวมเงินมัดจำ", f"{total_dep:,.0f} บาท")
-    
-    st.subheader("ข้อมูลรถ")
-    st.dataframe(df_car, use_container_width=True)
-    st.subheader("ข้อมูลลูกค้า")
-    st.dataframe(df_cust, use_container_width=True, hide_index=True)
-    st.subheader("ข้อมูลการจอง")
-    if not df_book.empty:
-        cols = ["รหัสจอง","รหัสรถ","ชื่อลูกค้า","วันที่เริ่ม","เวลาเริ่ม","วันที่คืน","เวลาคืน","สถานะการจอง","จำนวนวัน","ค่าเช่ารวม","เงินมัดจำ","หมายเหตุ"]
-        st.dataframe(df_book[[c for c in cols if c in df_book.columns]], use_container_width=True)
+    if df_book.empty:
+        st.info("ยังไม่มีข้อมูลการจอง")
+    else:
+        df_book["ค่าเช่ารวม"] = pd.to_numeric(df_book["ค่าเช่ารวม"], errors="coerce").fillna(0)
+        df_book["เงินมัดจำ"] = pd.to_numeric(df_book["เงินมัดจำ"], errors="coerce").fillna(0)
+        
+        total_income = df_book["ค่าเช่ารวม"].sum()
+        total_deposit = df_book["เงินมัดจำ"].sum()
+        active_bookings = len(df_book[df_book["สถานะการจอง"]=="กำลังใช้งาน"])
+        pending_bookings = len(df_book[df_book["สถานะการจอง"]=="จองแล้ว"])
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("💰 รวมค่าเช่าทั้งหมด", f"{total_income:,.0f} บาท")
+        col2.metric("🔒 รับมัดจำทั้งหมด", f"{total_deposit:,.0f} บาท")
+        col3.metric("🚗 กำลังใช้งาน", active_bookings)
+        col4.metric("📅 จองแล้ว", pending_bookings)
+        
+        st.subheader("รายการทั้งหมด")
+        st.dataframe(df_book, use_container_width=True)
