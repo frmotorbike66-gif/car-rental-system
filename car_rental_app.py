@@ -310,7 +310,12 @@ elif menu == "📊 ปฏิทินการจอง":
     today = datetime.today()
     m = st.selectbox("เดือน", list(range(1,13)), index=today.month-1)
     y = st.selectbox("ปี", list(range(2025,2031)), index=2026-2025)
-    days_in_month = (datetime(y, m % 12 + 1, 1) - timedelta(days=1)).days if m != 12 else (datetime(y + 1, 1, 1) - timedelta(days=1)).days
+    
+    # คำนวณจำนวนวันในเดือน
+    if m == 12:
+    days_in_month = 31
+    else:
+    days_in_month = (datetime(y, m + 1, 1) - timedelta(days=1)).days
     
     df_car = read_csv(FILES["cars"])
     df_book = read_csv(FILES["bookings"])
